@@ -14,14 +14,14 @@
         v-model="searchQuery"
         placeholder="搜索图书..."
         clearable
-        @keyup.enter="fetchBooks"
+        @keyup.enter="handleSearch"
         style="max-width: 300px"
       >
         <template #prefix>
           <el-icon><Search /></el-icon>
         </template>
       </el-input>
-      <el-button @click="fetchBooks">搜索</el-button>
+      <el-button @click="handleSearch">搜索</el-button>
     </div>
     
     <!-- 图书表格 -->
@@ -34,12 +34,12 @@
       <el-table-column prop="id" label="ID" width="70" />
       <el-table-column label="封面" width="80">
         <template #default="{ row }">
-          <img
-            :src="row.cover_image || defaultCover"
+          <BookCover
+            :src="row.cover_image"
             :alt="row.title"
-            class="book-thumbnail"
-            @error="handleImageError"
-          >
+            placeholder="https://via.placeholder.com/60x80/6366f1/ffffff?text=Book"
+            class-name="book-thumbnail"
+          />
         </template>
       </el-table-column>
       <el-table-column prop="title" label="书名" min-width="150">
@@ -191,24 +191,34 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive } from 'vue'
 import { api } from '@/api'
 import type { Book, BookCreate } from '@/types'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Search } from '@element-plus/icons-vue'
+import { useBookList } from '@/composables/useBookList'
+import BookCover from '@/components/BookCover.vue'
 
-const loading = ref(false)
 const submitting = ref(false)
-const books = ref<Book[]>([])
-const total = ref(0)
-const currentPage = ref(1)
-const pageSize = ref(10)
-const searchQuery = ref('')
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const editingId = ref<number | null>(null)
 const bookFormRef = ref<FormInstance>()
-const defaultCover = 'https://via.placeholder.com/60x80/6366f1/ffffff?text=Book'
+
+const {
+  loading,
+  books,
+  total,
+  currentPage,
+  pageSize,
+  searchQuery,
+  fetchBooks,
+  handleSearch,
+  refresh
+} = useBookList({
+  initialPageSize: 10,
+  enableCategory: false
+})
 
 const bookForm = reactive<BookCreate>({
   title: '',
@@ -226,27 +236,6 @@ const bookRules: FormRules = {
   title: [{ required: true, message: '请输入书名', trigger: 'blur' }],
   author: [{ required: true, message: '请输入作者', trigger: 'blur' }],
   price: [{ required: true, message: '请输入价格', trigger: 'blur' }]
-}
-
-onMounted(() => {
-  fetchBooks()
-})
-
-async function fetchBooks() {
-  loading.value = true
-  try {
-    const response = await api.getBooks({
-      page: currentPage.value,
-      page_size: pageSize.value,
-      search: searchQuery.value || undefined
-    })
-    books.value = response.items
-    total.value = response.total
-  } catch (error) {
-    console.error('获取图书列表失败:', error)
-  } finally {
-    loading.value = false
-  }
 }
 
 function handleAdd() {
@@ -277,7 +266,7 @@ async function handleDelete(id: number) {
   try {
     await api.deleteBook(id)
     ElMessage.success('删除成功')
-    fetchBooks()
+    refresh()
   } catch (error) {
     console.error('删除失败:', error)
   }
@@ -299,7 +288,7 @@ async function handleSubmit() {
         ElMessage.success('添加成功')
       }
       dialogVisible.value = false
-      fetchBooks()
+      refresh()
     } catch (error) {
       console.error('操作失败:', error)
     } finally {
@@ -320,11 +309,6 @@ function resetForm() {
     cover_image: '',
     category: ''
   })
-}
-
-function handleImageError(e: Event) {
-  const img = e.target as HTMLImageElement
-  img.src = defaultCover
 }
 </script>
 
