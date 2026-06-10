@@ -34,20 +34,20 @@
         搜索
       </el-button>
     </div>
-    
+
     <!-- 结果统计 -->
     <div class="results-info">
       <span v-if="total > 0">共找到 <strong>{{ total }}</strong> 本图书</span>
       <span v-else-if="!loading">暂无图书</span>
     </div>
-    
+
     <!-- 图书列表 -->
     <div class="book-list" v-loading="loading">
       <el-row :gutter="24">
         <el-col v-for="book in books" :key="book.id" :xs="12" :sm="8" :md="6" :lg="4">
           <div class="book-card" @click="router.push(`/books/${book.id}`)">
             <div class="book-cover">
-              <img :src="book.cover_image || defaultCover" :alt="book.title" @error="handleImageError">
+              <BookCover :src="book.cover_image" :alt="book.title" />
               <div class="book-overlay">
                 <el-button type="primary" circle>
                   <el-icon><View /></el-icon>
@@ -68,11 +68,11 @@
           </div>
         </el-col>
       </el-row>
-      
+
       <!-- 空状态 -->
       <el-empty v-if="!loading && books.length === 0" description="暂无图书数据" />
     </div>
-    
+
     <!-- 分页 -->
     <div class="pagination" v-if="total > 0">
       <el-pagination
@@ -89,63 +89,31 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { api } from '@/api'
-import type { Book } from '@/types'
 import { Search, View } from '@element-plus/icons-vue'
+import BookCover from '@/components/BookCover.vue'
+import { useBookList } from '@/composables/useBookList'
 
 const router = useRouter()
 
-const loading = ref(false)
-const books = ref<Book[]>([])
-const total = ref(0)
-const currentPage = ref(1)
-const pageSize = ref(12)
-const searchQuery = ref('')
-const selectedCategory = ref('')
-const categories = ref<string[]>([])
-const defaultCover = 'https://via.placeholder.com/200x280/6366f1/ffffff?text=Book'
+const {
+  loading,
+  books,
+  total,
+  currentPage,
+  pageSize,
+  searchQuery,
+  selectedCategory,
+  categories,
+  fetchBooks,
+  fetchCategories,
+  handleSearch
+} = useBookList({ defaultPageSize: 12, withCategory: true })
 
 onMounted(async () => {
   await Promise.all([fetchBooks(), fetchCategories()])
 })
-
-async function fetchBooks() {
-  loading.value = true
-  try {
-    const response = await api.getBooks({
-      page: currentPage.value,
-      page_size: pageSize.value,
-      search: searchQuery.value || undefined,
-      category: selectedCategory.value || undefined
-    })
-    books.value = response.items
-    total.value = response.total
-  } catch (error) {
-    console.error('获取图书列表失败:', error)
-  } finally {
-    loading.value = false
-  }
-}
-
-async function fetchCategories() {
-  try {
-    categories.value = await api.getCategories()
-  } catch (error) {
-    console.error('获取分类失败:', error)
-  }
-}
-
-function handleSearch() {
-  currentPage.value = 1
-  fetchBooks()
-}
-
-function handleImageError(e: Event) {
-  const img = e.target as HTMLImageElement
-  img.src = defaultCover
-}
 </script>
 
 <style scoped>
