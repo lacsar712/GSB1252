@@ -14,14 +14,14 @@
         v-model="searchQuery"
         placeholder="搜索图书..."
         clearable
-        @keyup.enter="fetchBooks"
+        @keyup.enter="handleSearch"
         style="max-width: 300px"
       >
         <template #prefix>
           <el-icon><Search /></el-icon>
         </template>
       </el-input>
-      <el-button @click="fetchBooks">搜索</el-button>
+      <el-button @click="handleSearch">搜索</el-button>
     </div>
     
     <!-- 图书表格 -->
@@ -34,12 +34,7 @@
       <el-table-column prop="id" label="ID" width="70" />
       <el-table-column label="封面" width="80">
         <template #default="{ row }">
-          <img
-            :src="row.cover_image || defaultCover"
-            :alt="row.title"
-            class="book-thumbnail"
-            @error="handleImageError"
-          >
+          <BookCover :src="row.cover_image" :alt="row.title" thumbnail />
         </template>
       </el-table-column>
       <el-table-column prop="title" label="书名" min-width="150">
@@ -196,19 +191,26 @@ import { api } from '@/api'
 import type { Book, BookCreate } from '@/types'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Search } from '@element-plus/icons-vue'
+import { useBookList } from '@/composables/useBookList'
+import BookCover from '@/components/BookCover.vue'
 
-const loading = ref(false)
+const {
+  loading,
+  books,
+  total,
+  currentPage,
+  pageSize,
+  searchQuery,
+  fetchBooks,
+  handleSearch,
+  init
+} = useBookList({ pageSize: 10 })
+
 const submitting = ref(false)
-const books = ref<Book[]>([])
-const total = ref(0)
-const currentPage = ref(1)
-const pageSize = ref(10)
-const searchQuery = ref('')
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const editingId = ref<number | null>(null)
 const bookFormRef = ref<FormInstance>()
-const defaultCover = 'https://via.placeholder.com/60x80/6366f1/ffffff?text=Book'
 
 const bookForm = reactive<BookCreate>({
   title: '',
@@ -229,25 +231,8 @@ const bookRules: FormRules = {
 }
 
 onMounted(() => {
-  fetchBooks()
+  init()
 })
-
-async function fetchBooks() {
-  loading.value = true
-  try {
-    const response = await api.getBooks({
-      page: currentPage.value,
-      page_size: pageSize.value,
-      search: searchQuery.value || undefined
-    })
-    books.value = response.items
-    total.value = response.total
-  } catch (error) {
-    console.error('获取图书列表失败:', error)
-  } finally {
-    loading.value = false
-  }
-}
 
 function handleAdd() {
   isEdit.value = false
@@ -321,11 +306,6 @@ function resetForm() {
     category: ''
   })
 }
-
-function handleImageError(e: Event) {
-  const img = e.target as HTMLImageElement
-  img.src = defaultCover
-}
 </script>
 
 <style scoped>
@@ -349,13 +329,6 @@ function handleImageError(e: Event) {
 .search-bar {
   display: flex;
   gap: 12px;
-}
-
-.book-thumbnail {
-  width: 40px;
-  height: 55px;
-  object-fit: cover;
-  border-radius: 4px;
 }
 
 .book-title {
