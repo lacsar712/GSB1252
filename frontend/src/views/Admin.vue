@@ -7,7 +7,7 @@
         添加图书
       </el-button>
     </div>
-    
+
     <!-- 搜索栏 -->
     <div class="search-bar">
       <el-input
@@ -23,7 +23,7 @@
       </el-input>
       <el-button @click="fetchBooks">搜索</el-button>
     </div>
-    
+
     <!-- 图书表格 -->
     <el-table
       :data="books"
@@ -34,12 +34,12 @@
       <el-table-column prop="id" label="ID" width="70" />
       <el-table-column label="封面" width="80">
         <template #default="{ row }">
-          <img
-            :src="row.cover_image || defaultCover"
+          <BookCover
+            :src="row.cover_image"
             :alt="row.title"
-            class="book-thumbnail"
-            @error="handleImageError"
-          >
+            size="thumbnail"
+            img-class="book-thumbnail"
+          />
         </template>
       </el-table-column>
       <el-table-column prop="title" label="书名" min-width="150">
@@ -87,7 +87,7 @@
         </template>
       </el-table-column>
     </el-table>
-    
+
     <!-- 分页 -->
     <div class="pagination">
       <el-pagination
@@ -98,7 +98,7 @@
         @current-change="fetchBooks"
       />
     </div>
-    
+
     <!-- 添加/编辑对话框 -->
     <el-dialog
       v-model="dialogVisible"
@@ -124,7 +124,7 @@
             </el-form-item>
           </el-col>
         </el-row>
-        
+
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="出版社" prop="publisher">
@@ -137,7 +137,7 @@
             </el-form-item>
           </el-col>
         </el-row>
-        
+
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="价格" prop="price">
@@ -161,15 +161,15 @@
             </el-form-item>
           </el-col>
         </el-row>
-        
+
         <el-form-item label="分类" prop="category">
           <el-input v-model="bookForm.category" placeholder="请输入分类" />
         </el-form-item>
-        
+
         <el-form-item label="封面" prop="cover_image">
           <el-input v-model="bookForm.cover_image" placeholder="请输入封面图片URL" />
         </el-form-item>
-        
+
         <el-form-item label="简介" prop="description">
           <el-input
             v-model="bookForm.description"
@@ -179,7 +179,7 @@
           />
         </el-form-item>
       </el-form>
-      
+
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="submitting" @click="handleSubmit">
@@ -196,19 +196,24 @@ import { api } from '@/api'
 import type { Book, BookCreate } from '@/types'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Search } from '@element-plus/icons-vue'
+import BookCover from '@/components/BookCover.vue'
+import { useBookList } from '@/composables/useBookList'
 
-const loading = ref(false)
+const {
+  loading,
+  books,
+  total,
+  currentPage,
+  pageSize,
+  searchQuery,
+  fetchBooks
+} = useBookList({ defaultPageSize: 10 })
+
 const submitting = ref(false)
-const books = ref<Book[]>([])
-const total = ref(0)
-const currentPage = ref(1)
-const pageSize = ref(10)
-const searchQuery = ref('')
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const editingId = ref<number | null>(null)
 const bookFormRef = ref<FormInstance>()
-const defaultCover = 'https://via.placeholder.com/60x80/6366f1/ffffff?text=Book'
 
 const bookForm = reactive<BookCreate>({
   title: '',
@@ -231,23 +236,6 @@ const bookRules: FormRules = {
 onMounted(() => {
   fetchBooks()
 })
-
-async function fetchBooks() {
-  loading.value = true
-  try {
-    const response = await api.getBooks({
-      page: currentPage.value,
-      page_size: pageSize.value,
-      search: searchQuery.value || undefined
-    })
-    books.value = response.items
-    total.value = response.total
-  } catch (error) {
-    console.error('获取图书列表失败:', error)
-  } finally {
-    loading.value = false
-  }
-}
 
 function handleAdd() {
   isEdit.value = false
@@ -285,10 +273,10 @@ async function handleDelete(id: number) {
 
 async function handleSubmit() {
   if (!bookFormRef.value) return
-  
+
   await bookFormRef.value.validate(async (valid) => {
     if (!valid) return
-    
+
     submitting.value = true
     try {
       if (isEdit.value && editingId.value) {
@@ -320,11 +308,6 @@ function resetForm() {
     cover_image: '',
     category: ''
   })
-}
-
-function handleImageError(e: Event) {
-  const img = e.target as HTMLImageElement
-  img.src = defaultCover
 }
 </script>
 
