@@ -47,7 +47,11 @@
         <el-col v-for="book in books" :key="book.id" :xs="12" :sm="8" :md="6" :lg="4">
           <div class="book-card" @click="router.push(`/books/${book.id}`)">
             <div class="book-cover">
-              <img :src="book.cover_image || defaultCover" :alt="book.title" @error="handleImageError">
+              <BookCover
+                :src="book.cover_image"
+                :alt="book.title"
+                class-name="cover-image"
+              />
               <div class="book-overlay">
                 <el-button type="primary" circle>
                   <el-icon><View /></el-icon>
@@ -89,63 +93,27 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { api } from '@/api'
-import type { Book } from '@/types'
 import { Search, View } from '@element-plus/icons-vue'
+import { useBookList } from '@/composables/useBookList'
+import BookCover from '@/components/BookCover.vue'
 
 const router = useRouter()
 
-const loading = ref(false)
-const books = ref<Book[]>([])
-const total = ref(0)
-const currentPage = ref(1)
-const pageSize = ref(12)
-const searchQuery = ref('')
-const selectedCategory = ref('')
-const categories = ref<string[]>([])
-const defaultCover = 'https://via.placeholder.com/200x280/6366f1/ffffff?text=Book'
-
-onMounted(async () => {
-  await Promise.all([fetchBooks(), fetchCategories()])
+const {
+  loading,
+  books,
+  total,
+  currentPage,
+  pageSize,
+  searchQuery,
+  selectedCategory,
+  categories,
+  handleSearch
+} = useBookList({
+  initialPageSize: 12,
+  enableCategory: true
 })
-
-async function fetchBooks() {
-  loading.value = true
-  try {
-    const response = await api.getBooks({
-      page: currentPage.value,
-      page_size: pageSize.value,
-      search: searchQuery.value || undefined,
-      category: selectedCategory.value || undefined
-    })
-    books.value = response.items
-    total.value = response.total
-  } catch (error) {
-    console.error('获取图书列表失败:', error)
-  } finally {
-    loading.value = false
-  }
-}
-
-async function fetchCategories() {
-  try {
-    categories.value = await api.getCategories()
-  } catch (error) {
-    console.error('获取分类失败:', error)
-  }
-}
-
-function handleSearch() {
-  currentPage.value = 1
-  fetchBooks()
-}
-
-function handleImageError(e: Event) {
-  const img = e.target as HTMLImageElement
-  img.src = defaultCover
-}
 </script>
 
 <style scoped>
@@ -214,14 +182,14 @@ function handleImageError(e: Event) {
   background: #f1f5f9;
 }
 
-.book-cover img {
+.cover-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
   transition: transform 0.3s;
 }
 
-.book-card:hover .book-cover img {
+.book-card:hover .cover-image {
   transform: scale(1.05);
 }
 
